@@ -1,0 +1,316 @@
+# === 项目基础配置 ===
+project:
+  # 项目名称（用于输出目录命名）
+  name: "mxene-heterostructure-energy"
+  # 运行模式：full-auto（全自动，无审批）/ semi-auto（关键阶段需审批）/ docs-first（文档优先）
+  mode: "full-auto"
+
+# === 研究课题配置 ===
+research:
+  # 研究主题（英文）
+  topic: "MXene-Based Two-Dimensional Heterostructures for High-Performance Electrochemical Energy Storage and Conversion"
+  # 研究领域（用于文献检索和趋势分析）
+  domains:
+    - "materials-chemistry"
+  # 每日自动收集的论文数量上限
+  daily_paper_count: 10
+  # 论文质量评分阈值（低于此分的论文会被过滤）
+  quality_threshold: 4.0
+
+# === 运行时配置 ===
+runtime:
+  # 时区设置（影响日志时间戳、会议截止时间等）
+  timezone: "Asia/Shanghai"
+  # 最大并行任务数（同时运行的子任务数量）
+  max_parallel_tasks: 3
+  # 人工审批超时时间（小时），超过此时间未审批自动继续
+  approval_timeout_hours: 12
+  # API 请求失败时的最大重试次数
+  retry_limit: 2
+
+# === 通知配置 ===
+notifications:
+  # 通知渠道：console（控制台）/ slack / discord / email
+  channel: "console"
+  # 通知目标（如邮箱地址、Slack webhook URL 等，channel=console 时留空）
+  target: ""
+  # 各阶段开始时发送通知
+  on_stage_start: true
+  # 各阶段失败时发送通知
+  on_stage_fail: true
+  # 需要人工审批时发送通知
+  on_gate_required: true
+
+# === 知识库配置 ===
+knowledge_base:
+  # 后端存储类型：markdown（文本文件）/ vector_db（向量数据库）
+  backend: "markdown"
+  # 知识库根目录路径（相对于项目根目录）
+  root: "docs/kb"
+
+# === OpenClaw 桥接配置 ===
+# 与外部 AI 工具（如 AutoGen、CrewAI 等）的集成开关
+openclaw_bridge:
+  use_cron: false
+  use_message: false
+  use_memory: false
+  use_sessions_spawn: false
+  use_web_fetch: false
+  use_browser: false
+
+# === LLM（大语言模型）配置 ===
+llm:
+  # LLM 提供商：openai-compatible（OpenRouter/DeepSeek 等兼容接口）/ openai / minimax / acp
+  provider: "openai-compatible"
+  # API 基础 URL（兼容 OpenAI 格式的网关地址）
+  base_url: "http://127.0.0.1:8080/v1"
+  # API 协议：chat_completions（标准 Chat 格式）/ responses（Responses-only 网关）
+  wire_api: "chat_completions"  # Set to "responses" for Responses-only gateways
+  # API Key 所在的环境变量名（推荐用环境变量而非明文）
+  api_key_env: "OPENAI_API_KEY"
+  # API Key 明文（仅当不使用环境变量时填写，否则留空或写 "pwd" 占位）
+  api_key: "pwd"
+  # 主用模型名称（优先使用此模型）
+  primary_model: "gpt-5.2"
+  # 备用模型列表（主模型失败时依次降级）
+  fallback_models:
+    - "gpt-5.1"
+    - "gpt-5.0"
+  # --- MiniMax 提供商示例 ---
+  # provider: "minimax"
+  # api_key_env: "MINIMAX_API_KEY"
+  # primary_model: "MiniMax-M2.5"
+  # fallback_models:
+  #   - "MiniMax-M2.5-highspeed"
+
+# === 安全与审批控制 ===
+security:
+  # Human-In-The-Loop：需要人工审批才能继续的阶段编号
+  # 对应：5=文献筛选 9=实验设计 20=论文定稿；使用 --auto-approve 可自动跳过
+  hitl_required_stages: [5, 9, 20]
+  # 是否允许未经人工确认直接发布论文（false = 发布前强制审批）
+  allow_publish_without_approval: false
+  # 是否在日志中自动脱敏 API Key、密码等敏感字段
+  redact_sensitive_logs: true
+
+# === 实验执行引擎 ===
+experiment:
+  # ★ mode 决定实验结果的真实性
+  #   "sandbox"    — 在本地沙盒中实际执行生成的 Python 代码，产出真实实验数据
+  #   "docker"     — 在 Docker 容器中执行，支持 GPU 直通、依赖自动安装、内存隔离
+  #   "ssh_remote" — 在远程服务器上执行（实验室 GPU 服务器等）
+  #   "colab_drive"— 通过 Google Drive 中转，在 Colab 中异步执行
+  #   "simulated"  — 不执行代码，使用公式生成假数据（仅用于框架开发调试，不应用于论文生成）
+  mode: "sandbox"
+  # 单次实验最大执行时间（秒），超时强制终止
+  time_budget_sec: 300
+  # Stage 13 迭代优化实验代码的最大轮次
+  max_iterations: 10
+  # todo 根据实际情况修改，实验代码打印的主指标名称，管道通过此字段判断实验结果优劣。
+  metric_key: "specific_capacitance"  # 比容量 (F/g)
+  # todo 根据实际情况修改，指标优化方向：minimize（越小越好，如 loss）/ maximize（越大越好，如 accuracy）
+  metric_direction: "maximize"
+  # --- 本地沙盒（mode: sandbox 时生效）---
+  sandbox:
+    # 沙盒执行实验代码用的 Python 解释器路径
+    python_path: "D:\Anaconda3\envs\AutoResearchClaw\python.exe"
+    # true = 检测不到 GPU 时提前报错；false = 静默降级为 CPU
+    gpu_required: false
+    # 沙盒进程内存上限（MB，软限制），超出时实验会被杀死
+    max_memory_mb: 4096
+  # --- Docker 容器沙盒（mode: docker 时生效）---
+  # 使用前需先构建镜像：docker build -t researchclaw/experiment:latest researchclaw/docker/
+#  docker:
+#    # 实验镜像名称
+#    image: "researchclaw/experiment:latest"
+#    # 是否向容器传入 GPU（--gpus all）
+#    gpu_enabled: true
+#    # gpu_device_ids: [0]        # 指定 GPU 编号，空列表 = 使用所有 GPU
+#    # 容器内存硬限制（MB），超出直接 OOM Kill
+#    memory_limit_mb: 8192
+#    # 网络策略：
+#    #   none        = 全程断网（最安全）
+#    #   setup_only  = 仅安装依赖时联网，实验执行时断网（推荐）
+#    #   pip_only    = 同 setup_only
+#    #   full        = 全程联网（仅用于调试）
+#    network_policy: "setup_only"
+#    # pip_pre_install: ["torchdiffeq", "einops"]  # 预装的额外依赖包
+#    # 是否自动扫描实验代码的 import 并生成 requirements.txt
+#    auto_install_deps: true
+#    # 共享内存大小（MB），PyTorch 多进程 DataLoader 需要足够大
+#    shm_size_mb: 2048
+#    # false = 实验结束后自动删除容器，避免磁盘堆积
+#    keep_containers: false
+  # --- 远程 SSH 执行（mode: ssh_remote 时生效）---
+#  ssh_remote:
+#    host: ""                # SSH 主机名或 IP
+#    user: ""                # SSH 用户名（留空则使用当前系统用户）
+#    port: 22                # SSH 端口
+#    key_path: ""            # 私钥路径（留空则默认 ~/.ssh/id_rsa）
+#    gpu_ids: []             # 指定使用的 GPU 编号，如 [0, 1]，对应 CUDA_VISIBLE_DEVICES
+#    # 实验代码上传和执行的远程工作目录
+#    remote_workdir: "/tmp/researchclaw_experiments"
+#    # 远程 Python 解释器路径
+#    remote_python: "python3"
+#    # 每次实验前在远程执行的 shell 命令，如激活 conda 环境
+#    setup_commands: []      # e.g. ["source ~/venv/bin/activate", "pip install torch"]
+#    # Docker-over-SSH：在远程机器上再套一层 Docker（最高隔离性）
+#    use_docker: false       # true = 远程也跑 Docker 容器
+#    docker_image: "researchclaw/experiment:latest"
+#    docker_network_policy: "none"   # none | full
+#    docker_memory_limit_mb: 8192
+#    docker_shm_size_mb: 2048
+  # --- OpenCode Beast Mode：AI 辅助代码生成（复杂实验效果显著）---
+  # 安装：npm i -g opencode-ai@latest  或运行 `researchclaw setup`
+  opencode:
+    # 总开关，false = 退回内置 CodeAgent
+    enabled: true
+    # true = 无需确认自动调用；false = 每次弹出交互提示
+    auto: true
+    # 实验复杂度评分阈值（0.0-1.0），超过此值才触发 OpenCode
+    # 0.2 = 大多数实验都触发；调高可节省时间（如 0.7 = 仅高复杂度触发）
+    complexity_threshold: 0.2
+    # 指定 OpenCode 使用的模型，留空则继承 llm.primary_model
+    model: ""
+    # OpenCode 单次生成的最大等待时间（秒）
+    timeout_sec: 600
+    # OpenCode 失败后的重试次数
+    max_retries: 1
+    # 代码收集完成后是否删除 OpenCode 的临时工作目录
+    workspace_cleanup: true
+
+# ============================================================================
+# SSH Remote Examples
+# ============================================================================
+#
+# 1. Lab server (bare Python, basic sandboxing):
+#   experiment:
+#     mode: "ssh_remote"
+#     ssh_remote:
+#       host: "gpu-server.lab.edu"
+#       user: "researcher"
+#       key_path: "~/.ssh/id_rsa"
+#       gpu_ids: [0]
+#       remote_python: "python3"
+#
+# 2. Lab server (Docker — most secure):
+#   experiment:
+#     mode: "ssh_remote"
+#     ssh_remote:
+#       host: "gpu-server.lab.edu"
+#       user: "researcher"
+#       key_path: "~/.ssh/id_rsa"
+#       gpu_ids: [0]
+#       use_docker: true
+#       docker_image: "researchclaw/experiment:latest"
+#       docker_network_policy: "none"
+#
+# 3. Colab via SSH tunnel:
+#   experiment:
+#     mode: "ssh_remote"
+#     ssh_remote:
+#       host: "localhost"
+#       port: 12345
+#       user: "root"
+#       remote_python: "python3"
+#       setup_commands:
+#         - "pip install torch torchvision -q"
+#
+# 4. Colab via Google Drive (most robust, no SSH needed):
+#   experiment:
+#     mode: "colab_drive"
+#     colab_drive:
+#       drive_root: "~/Library/CloudStorage/GoogleDrive-you@gmail.com/My Drive/researchclaw"
+#       poll_interval_sec: 30
+#       timeout_sec: 3600
+#       setup_script: "pip install torch torchvision -q"
+#   # Then in Colab: run the colab_worker.py that appears in your Drive
+
+  # --- Google Colab 异步执行（mode: colab_drive 时生效）---
+  # 原理：代码写入 Drive → Colab Worker 检测并执行 → 结果写回 Drive → 管道轮询读取
+  colab_drive:
+    # 本地挂载的 Google Drive 路径
+    drive_root: ""
+    # 轮询结果的时间间隔（秒）
+    poll_interval_sec: 30
+    # 等待 Colab 执行结果的最大时间（秒），3600 = 1 小时
+    timeout_sec: 3600
+    # Colab 中每次实验前执行的 shell 命令，如 "pip install torch -q"
+    setup_script: ""
+
+  # --- 科学图表生成智能体 ---
+  # Decision Agent 分析论文内容，自动选择图表生成方式：
+  #   代码图（折线图、柱状图）→ Matplotlib / TikZ
+  #   示意图（架构图、流程图）→ Gemini Nano Banana 原生图像生成
+  figure_agent:
+    # 总开关
+    enabled: true
+    # 论文中生成图表的数量下限
+    min_figures: 3
+    # 论文中生成图表的数量上限
+    max_figures: 10
+    # 图表代码渲染失败时自动修复的最大迭代轮次
+    max_iterations: 3
+    # 单张图表渲染超时（秒）
+    render_timeout_sec: 30
+    use_docker: null  # null = 自动检测，true = 强制用 Docker，false = 禁用
+    docker_image: "researchclaw/experiment:latest"
+    # 图表输出格式：
+    #   "python" = Matplotlib/Seaborn 代码
+    #   "latex"  = TikZ/PGFPlots 代码（直接嵌入论文 .tex）
+    output_format: "latex"
+    # 是否启用 Gemini 原生图像生成（用于架构图、流程图等示意图）
+    nano_banana_enabled: false
+    # gemini_api_key: ""  # 也可设置环境变量 GEMINI_API_KEY
+    # Nano Banana 使用的 Gemini 模型名
+    gemini_model: "gemini-2.5-flash-image"
+    # false = 图表生成失败时跳过，论文继续生成；true = 失败则阻断整个管道
+    strict_mode: false
+    # 输出图片分辨率（DPI），300 满足大多数期刊投稿要求
+    dpi: 300
+
+# === 自定义提示词配置 ===
+# 用于定制各阶段 LLM 的提示词模板，实现特定领域的行为调整
+# 使用方法：复制 prompts.default.yaml，修改需要的提示词，然后在此指定路径
+prompts:
+  # 自定义提示词 YAML 文件路径（留空 = 使用内置默认提示词）
+  # e.g. "my_prompts.yaml" 或 "prompts/materials_chemistry.yaml"
+  custom_file: ""
+
+
+# === MetaClaw 集成 ===
+# MetaClaw 是独立运行的技能注入与质量评估代理，代理拦截 LLM 请求，注入历史经验规则
+# 启动方式：metaclaw start --mode skills_only
+metaclaw_bridge:
+  # 总开关，false = 不走 MetaClaw 代理，直接调用 LLM
+  enabled: false
+  # MetaClaw 代理监听地址，所有 LLM 请求通过此代理转发
+  proxy_url: "http://localhost:30000"
+  # MetaClaw 技能文件目录，存放从历史失败中自动提取的经验规则
+  skills_dir: "~/.metaclaw/skills"
+  # MetaClaw 代理宕机时的直连 LLM 备用地址
+  fallback_url: ""
+  fallback_api_key: ""
+
+  # --- 过程奖励模型（PRM）质量门 ---
+  # 在关键阶段用 LLM 打分评估输出质量，评分 -1 则该阶段标记为 FAILED
+  prm:
+    enabled: false
+    # OpenAI 兼容的 PRM 评分 API 地址
+    api_base: ""
+    api_key_env: "PRM_API_KEY"
+    api_key: ""
+    model: "gpt-5.2"
+    # 多数投票次数：调用 N 次 LLM 打分，取多数结果决定是否通过
+    votes: 3
+    # 在哪些阶段执行 PRM 质量评估
+    gate_stages: [5, 9, 15, 20]
+
+  # --- 失败经验自动转技能 ---
+  # 将管道失败事件自动提炼为 MetaClaw 技能，供后续运行注入
+  lesson_to_skill:
+    enabled: true
+    # 只将达到此严重级别的失败转换为技能（error / warning）
+    min_severity: "error"
+    # 每次运行最多生成的新技能条数，避免知识库无限膨胀
+    max_skills_per_run: 3

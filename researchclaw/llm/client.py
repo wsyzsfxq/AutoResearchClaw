@@ -431,7 +431,8 @@ class LLMClient:
             # MetaClaw bridge: inject extra headers (session ID, stage info, etc.)
             headers.update(self.config.extra_headers)
 
-            req = urllib.request.Request(url, data=payload, headers=headers)
+            logger.debug("LLM request: %s", payload)
+            req = urllib.request.Request(url, data=payload, headers=headers, timeout=self.config.timeout_sec)
 
             try:
                 with urllib.request.urlopen(

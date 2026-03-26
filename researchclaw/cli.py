@@ -153,6 +153,12 @@ def _generate_run_id(topic: str) -> str:
 
 
 def cmd_run(args: argparse.Namespace) -> int:
+    # 在 researchclaw/cli.py 的 cmd_run() 函数开头添加
+    import logging
+    logging.basicConfig(
+        level=logging.DEBUG,  # 或 DEBUG
+        format='%(asctime)s | %(levelname)s | %(name)s | %(lineno)d | %(funcName)s | %(message)s',
+    )
     resolved = _resolve_config_or_exit(args)
     if resolved is None:
         return 1
