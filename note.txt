@@ -1,8 +1,12 @@
 开始新的
 researchclaw run --config config.arc.yaml --auto-approve
 
-自动续跑
+python -m researchclaw run --config config.arc.yaml --auto-approve
+
+断点续跑
 researchclaw run --config config.arc.yaml --auto-approve --resume --output artifacts/rc-20260325-105604-bd4d2d
+
+python -m researchclaw run --config config.arc.yaml --auto-approve --resume --output artifacts/rc-20260325-105604-bd4d2d
 
 查看环境变量
 conda env config vars list

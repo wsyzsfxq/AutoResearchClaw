@@ -71,11 +71,10 @@ llm:
   # API Key 明文（仅当不使用环境变量时填写，否则留空或写 "pwd" 占位）
   api_key: "pwd"
   # 主用模型名称（优先使用此模型）
-  primary_model: "gpt-5.2"
+  primary_model: "gpt-5"
   # 备用模型列表（主模型失败时依次降级）
   fallback_models:
-    - "gpt-5.1"
-    - "gpt-5.0"
+    - "gpt-5"
   # --- MiniMax 提供商示例 ---
   # provider: "minimax"
   # api_key_env: "MINIMAX_API_KEY"
@@ -103,7 +102,7 @@ experiment:
   #   "simulated"  — 不执行代码，使用公式生成假数据（仅用于框架开发调试，不应用于论文生成）
   mode: "sandbox"
   # 单次实验最大执行时间（秒），超时强制终止
-  time_budget_sec: 300
+  time_budget_sec: 3000
   # Stage 13 迭代优化实验代码的最大轮次
   max_iterations: 10
   # todo 根据实际情况修改，实验代码打印的主指标名称，管道通过此字段判断实验结果优劣。
@@ -113,7 +112,7 @@ experiment:
   # --- 本地沙盒（mode: sandbox 时生效）---
   sandbox:
     # 沙盒执行实验代码用的 Python 解释器路径
-    python_path: "D:\Anaconda3\envs\AutoResearchClaw\python.exe"
+    python_path: "D:/Anaconda3/envs/AutoResearchClaw/python.exe"
     # true = 检测不到 GPU 时提前报错；false = 静默降级为 CPU
     gpu_required: false
     # 沙盒进程内存上限（MB，软限制），超出时实验会被杀死
@@ -173,7 +172,7 @@ experiment:
     # 指定 OpenCode 使用的模型，留空则继承 llm.primary_model
     model: ""
     # OpenCode 单次生成的最大等待时间（秒）
-    timeout_sec: 600
+    timeout_sec: 3000
     # OpenCode 失败后的重试次数
     max_retries: 1
     # 代码收集完成后是否删除 OpenCode 的临时工作目录
@@ -252,7 +251,7 @@ experiment:
     # 图表代码渲染失败时自动修复的最大迭代轮次
     max_iterations: 3
     # 单张图表渲染超时（秒）
-    render_timeout_sec: 30
+    render_timeout_sec: 300
     use_docker: null  # null = 自动检测，true = 强制用 Docker，false = 禁用
     docker_image: "researchclaw/experiment:latest"
     # 图表输出格式：

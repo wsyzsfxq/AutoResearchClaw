@@ -37,6 +37,8 @@ class DeficiencyType(enum.Enum):
     PERMISSION_ERROR = "permission_error"
     DATASET_UNAVAILABLE = "dataset_unavailable"
     GPU_OOM = "gpu_oom"
+    ZERO_VARIANCE_SEEDS = "zero_variance_seeds"
+    PHYSICALLY_IMPLAUSIBLE = "physically_implausible"
 
 
 @dataclass
@@ -314,7 +316,13 @@ def diagnose_experiment(
     # 11. Near-random accuracy (BUG-204)
     _check_near_random_accuracy(diag, experiment_summary)
 
-    # 12. No conditions at all
+    # 12. Zero-variance seeds (BUG-R6-08)
+    _check_zero_variance_seeds(diag, experiment_summary)
+
+    # 13. Physically implausible values (BUG-R6-09)
+    _check_physical_plausibility(diag, experiment_summary)
+
+    # 14. No conditions at all
     if not completed_conditions:
         diag.deficiencies.append(Deficiency(
             type=DeficiencyType.NO_CONDITIONS_COMPLETED,
@@ -629,6 +637,79 @@ def _check_insufficient_seeds(diag: ExperimentDiagnosis, summary: dict) -> None:
             description=f"{len(single_seed_conds)} condition(s) have only 1 seed (no variance estimate).",
             affected_conditions=single_seed_conds,
             suggested_fix="Increase seeds to at least 2 per condition, or reduce epoch count to fit time budget.",
+        ))
+
+
+def _check_zero_variance_seeds(diag: ExperimentDiagnosis, summary: dict) -> None:
+    """Detect if multiple seeds produce identical results (deterministic simulation)."""
+    cond_summaries = summary.get("condition_summaries", {})
+    affected = []
+    for cname, data in cond_summaries.items():
+        metrics = data.get("metrics", {})
+        # If std exists and is exactly 0.0 for all metrics, it's a red flag
+        # We check metrics that end with /std
+        std_keys = [k for k in metrics if k.endswith("/std")]
+        if std_keys and all(metrics[k] == 0.0 for k in std_keys):
+            affected.append(cname)
+
+    if affected:
+        diag.deficiencies.append(Deficiency(
+            type=DeficiencyType.ZERO_VARIANCE_SEEDS,
+            severity="major",
+            description=(
+                f"{len(affected)} condition(s) produced zero variance across seeds. "
+                "The simulation/experiment is likely deterministic, which prevents "
+                "proper statistical uncertainty estimation."
+            ),
+            affected_conditions=sorted(affected),
+            suggested_fix=(
+                "Introduce stochasticity/noise into the experiment or simulation code. "
+                "Ensure that different random seeds result in measured variations."
+            ),
+        ))
+
+
+def _check_physical_plausibility(diag: ExperimentDiagnosis, summary: dict) -> None:
+    """Detect physically impossible values (e.g., extreme capacitance)."""
+    ms = summary.get("metrics_summary", {})
+    if not ms:
+        return
+
+    extreme_high = []
+    extreme_low = []
+
+    # Domain specific heuristics (e.g., Specific Capacitance in F/g)
+    SC_KEYS = {"specific_capacitance", "sc", "capacitance"}
+    
+    for key, val in ms.items():
+        base_name = key.lower().split("/")[-1]
+        if base_name in SC_KEYS:
+            v_max = val.get("max", val) if isinstance(val, dict) else val
+            try:
+                fv = float(v_max)
+                if fv > 100000.0:  # > 10^5 F/g is implausible for most materials
+                    extreme_high.append(f"{key}={fv:.1e}")
+                if fv < 0.0:
+                    extreme_low.append(f"{key}={fv:.1f}")
+            except (TypeError, ValueError):
+                continue
+
+    if extreme_high:
+        diag.deficiencies.append(Deficiency(
+            type=DeficiencyType.PHYSICALLY_IMPLAUSIBLE,
+            severity="critical",
+            description=f"Physically implausible HIGH values detected: {', '.join(extreme_high)}",
+            suggested_fix=(
+                "Check unit conversion logic. Ensure current/voltage scales are realistic. "
+                "Ensure division by zero or near-zero slopes in capacitance calculation is guarded."
+            ),
+        ))
+    if extreme_low:
+        diag.deficiencies.append(Deficiency(
+            type=DeficiencyType.PHYSICALLY_IMPLAUSIBLE,
+            severity="critical",
+            description=f"Physically implausible NEGATIVE values detected: {', '.join(extreme_low)}",
+            suggested_fix="Check data signs. Capacitance/Accuracy should be positive.",
         ))
 
 

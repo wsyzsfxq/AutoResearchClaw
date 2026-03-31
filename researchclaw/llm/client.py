@@ -78,7 +78,7 @@ class LLMConfig:
     temperature: float = 0.7
     max_retries: int = 3
     retry_base_delay: float = 2.0
-    timeout_sec: int = 300
+    timeout_sec: int = 3000
     user_agent: str = _DEFAULT_USER_AGENT
     # MetaClaw bridge: extra headers for proxy requests
     extra_headers: dict[str, str] = field(default_factory=dict)
@@ -431,8 +431,9 @@ class LLMClient:
             # MetaClaw bridge: inject extra headers (session ID, stage info, etc.)
             headers.update(self.config.extra_headers)
 
-            logger.debug("LLM request: %s", payload)
-            req = urllib.request.Request(url, data=payload, headers=headers, timeout=self.config.timeout_sec)
+            # logger.debug(f"LLM request url: {url}, headers: {headers}")
+            # logger.debug(f"LLM request payload: {payload}")
+            req = urllib.request.Request(url, data=payload, headers=headers)
 
             try:
                 with urllib.request.urlopen(
