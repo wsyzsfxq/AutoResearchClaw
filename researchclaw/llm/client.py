@@ -48,6 +48,8 @@ _DEFAULT_USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 )
 
+_MAX_BACKOFF_SEC = 300  # 5-minute ceiling for retry delays
+
 
 @dataclass
 class LLMResponse:
@@ -327,7 +329,10 @@ class LLMClient:
                 # Retryable: 429 (rate limit), transient 400, 500, 502, 503, 504,
                 # 529 (Anthropic overloaded)
                 if status in (400, 429, 500, 502, 503, 504, 529):
-                    delay = self.config.retry_base_delay * (2**attempt)
+                    delay = min(
+                        self.config.retry_base_delay * (2**attempt),
+                        _MAX_BACKOFF_SEC,
+                    )
                     # Add jitter
                     import random
 
@@ -346,7 +351,10 @@ class LLMClient:
                 raise  # Other HTTP errors
             except urllib.error.URLError:
                 if attempt < self.config.max_retries - 1:
-                    delay = self.config.retry_base_delay * (2**attempt)
+                    delay = min(
+                        self.config.retry_base_delay * (2**attempt),
+                        _MAX_BACKOFF_SEC,
+                    )
                     time.sleep(delay)
                     continue
                 raise
@@ -401,13 +409,20 @@ class LLMClient:
                     body["max_tokens"] = max_tokens
 
             if json_mode:
-                # Many OpenAI-compatible proxies serving Claude models don't
-                # support the response_format parameter and return HTTP 400.
-                # Fall back to a system-prompt injection for non-OpenAI models.
-                if (
+                # Many OpenAI-compatible providers don't support the
+                # response_format parameter and return HTTP 400.
+                # Fall back to system-prompt injection for known-incompatible
+                # models (Claude, DeepSeek, Qwen, etc.) and the responses API.
+                _no_response_format = (
                     model.startswith("claude")
+                    or model.startswith("deepseek")
+                    or model.startswith("qwen")
+                    or model.startswith("yi-")
+                    or model.startswith("glm")
+                    or model.startswith("moonshot")
                     or self._normalize_wire_api(self.config.wire_api) == "responses"
-                ):
+                )
+                if _no_response_format:
                     _json_hint = (
                         "You MUST respond with valid JSON only. "
                         "Do not include any text outside the JSON object."

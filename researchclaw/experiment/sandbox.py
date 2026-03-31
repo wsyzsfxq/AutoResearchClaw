@@ -27,7 +27,8 @@ def validate_entry_point(entry_point: str) -> str | None:
     if not entry_point or not entry_point.strip():
         return "Entry point is empty"
     ep = Path(entry_point)
-    if ep.is_absolute():
+    # Check both native absolute and Unix-style absolute (for cross-platform safety)
+    if ep.is_absolute() or entry_point.startswith("/"):
         return f"Entry point must be a relative path, got: {entry_point}"
     if ".." in ep.parts:
         return f"Entry point must not contain '..': {entry_point}"
@@ -463,7 +464,7 @@ class ExperimentSandbox:
         # which loses the venv context (site-packages like numpy become unavailable).
         python = self.config.python_path
         python_path = Path(python)
-        if not python_path.is_absolute():
+        if not python_path.is_absolute() and python != "python":
             python_path = Path.cwd() / python_path
         # -u: unbuffered stdout/stderr so subprocess.run captures all output
         return [str(python_path), "-u", str(script_path)]

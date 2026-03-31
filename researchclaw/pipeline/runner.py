@@ -47,6 +47,9 @@ def _build_pipeline_summary(
         "run_id": run_id,
         "stages_executed": len(results),
         "stages_done": sum(1 for item in results if item.status == StageStatus.DONE),
+        "stages_paused": sum(
+            1 for item in results if item.status == StageStatus.PAUSED
+        ),
         "stages_blocked": sum(
             1 for item in results if item.status == StageStatus.BLOCKED_APPROVAL
         ),
@@ -456,15 +459,18 @@ def execute_pipeline(
             if result.decision == "degraded":
                 print(
                     f"{prefix} {stage.name} — DEGRADED ({elapsed:.1f}s) "
-                    f"— continuing with sanitization → {arts}"
+                    f"— continuing with sanitization -> {arts}"
                 )
             else:
-                print(f"{prefix} {stage.name} — done ({elapsed:.1f}s) → {arts}")
+                print(f"{prefix} {stage.name} — done ({elapsed:.1f}s) -> {arts}")
         elif result.status == StageStatus.FAILED:
             err = result.error or "unknown error"
             print(f"{prefix} {stage.name} — FAILED ({elapsed:.1f}s) — {err}")
         elif result.status == StageStatus.BLOCKED_APPROVAL:
             print(f"{prefix} {stage.name} — blocked (awaiting approval)")
+        elif result.status == StageStatus.PAUSED:
+            err = result.error or "paused"
+            print(f"{prefix} {stage.name} -- PAUSED ({elapsed:.1f}s) -- {err}")
         results.append(result)
 
         if kb_root is not None and result.status == StageStatus.DONE:
@@ -604,6 +610,14 @@ def execute_pipeline(
                 logger.warning("Noncritical stage %s failed - skipping", stage.name)
             else:
                 break
+        if result.status == StageStatus.PAUSED:
+            logger.warning(
+                "[%s] Pipeline paused at %s: %s",
+                run_id,
+                stage.name,
+                result.error or result.decision,
+            )
+            break
         if result.status == StageStatus.BLOCKED_APPROVAL and stop_on_gate:
             break
 
@@ -632,11 +646,39 @@ def execute_pipeline(
     except Exception:  # noqa: BLE001
         logger.warning("MetaClaw post-pipeline hook failed (non-blocking)")
 
+    # --- A-Evolve: structured diagnosis + gated skill generation ---
+    _has_failures = any(
+        "failed" in str(getattr(r, "status", "")).lower() for r in results
+    )
+    if lessons or _has_failures:
+        try:
+            from researchclaw.evolution_aevolve import run_aevolve_cycle
+            from researchclaw.llm.client import LLMClient
+
+            _aevolve_llm = LLMClient.from_rc_config(config)
+            _skills_dir = Path(
+                getattr(
+                    getattr(config, "metaclaw_bridge", None),
+                    "skills_dir",
+                    "~/.metaclaw/skills",
+                )
+            ).expanduser()
+            _aevolve_skills = run_aevolve_cycle(
+                lessons, results, _aevolve_llm, _skills_dir, run_dir,
+            )
+            if _aevolve_skills:
+                logger.info(
+                    "A-Evolve: generated %d skills: %s",
+                    len(_aevolve_skills), _aevolve_skills,
+                )
+        except Exception:  # noqa: BLE001
+            logger.debug("A-Evolve cycle skipped (non-blocking)", exc_info=True)
+
     # --- Package deliverables into a single folder ---
     try:
         deliverables_dir = _package_deliverables(run_dir, run_id, config)
         if deliverables_dir is not None:
-            print(f"[{run_id}] Deliverables packaged → {deliverables_dir}")
+            print(f"[{run_id}] Deliverables packaged -> {deliverables_dir}")
     except Exception:  # noqa: BLE001
         logger.warning("Deliverables packaging failed (non-blocking)")
 
@@ -1389,7 +1431,7 @@ def execute_iterative_pipeline(
     try:
         deliverables_dir = _package_deliverables(run_dir, run_id, config)
         if deliverables_dir is not None:
-            print(f"[{run_id}] Deliverables packaged → {deliverables_dir}")
+            print(f"[{run_id}] Deliverables packaged -> {deliverables_dir}")
     except Exception:  # noqa: BLE001
         logger.warning("Deliverables packaging failed (non-blocking)")
 
